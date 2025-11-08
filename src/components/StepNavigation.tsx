@@ -1,22 +1,22 @@
+// src/components/StepNavigation.tsx
+
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ProcessingMode } from "@/types";
 
 interface StepNavigationProps {
   currentStep: number;
   totalSteps: number;
   onBack: () => void;
-  mode: ProcessingMode;
 }
 
 const getStepLabel = (step: number): string => {
   const labels: { [key: number]: string } = {
-    1: "Upload Photo",
-    2: "Crop Image",
-    3: "Choose Layout",
-    4: "Processing",
-    5: "Compare Results",
-    6: "Print Preview",
+    1: "Upload Documents",
+    2: "Processing",
+    3: "Document Pairing",
+    4: "Review & Edit",
+    5: "Print Setup",
+    6: "Confirmation",
   };
   return labels[step] || "";
 };
