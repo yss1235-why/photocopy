@@ -1,22 +1,19 @@
-// src/services/api.ts - Hybrid Cloudinary + Python Service
+// src/services/api.ts - Complete API Service
 
 import { 
   ApiResponse, 
   UploadResponse, 
-  ProcessResponse, 
-  SheetPreviewResponse, 
-  CropData
+  ProcessResponse,
+  PairingResponse,
+  PrintPreviewRequest,
+  PrintJobRequest,
+  PrintJob,
+  PrintJobStatus
 } from "@/types";
-import { cloudinaryService } from "./cloudinary";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const USE_CLOUDINARY = import.meta.env.VITE_USE_CLOUDINARY !== "false";
 
 class ApiService {
-  private cloudinaryEnabled = USE_CLOUDINARY;
-  private cloudinaryFallbackCount = 0;
-  private maxCloudinaryAttempts = 3;
-
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -52,164 +49,119 @@ class ApiService {
   }
 
   /**
-   * Upload photo - Cloudinary primary, Python fallback
+   * Upload documents
    */
-  async uploadPhoto(file: File): Promise<ApiResponse<UploadResponse>> {
-    // Try Cloudinary first
-    if (this.cloudinaryEnabled && this.cloudinaryFallbackCount < this.maxCloudinaryAttempts) {
-      console.log("📤 Attempting Cloudinary upload (primary)...");
-      
-      const cloudinaryResult = await cloudinaryService.uploadImage(file);
-      
-      if (cloudinaryResult.success) {
-        console.log("✅ Cloudinary upload successful");
-        this.cloudinaryFallbackCount = 0;
-        return cloudinaryResult as ApiResponse<UploadResponse>;
-      }
-      
-      this.cloudinaryFallbackCount++;
-      console.warn(`⚠️ Cloudinary failed (${this.cloudinaryFallbackCount}/${this.maxCloudinaryAttempts}), trying Python...`);
-    }
-
-    // Python fallback
-    console.log("🔄 Using Python backend upload (fallback)...");
+  async uploadDocuments(files: File[]): Promise<ApiResponse<UploadResponse[]>> {
     const formData = new FormData();
-    formData.append("file", file);
+    files.forEach(file => formData.append("files", file));
     
-    const result = await this.request<UploadResponse>("/upload", {
+    return this.request<UploadResponse[]>("/upload", {
       method: "POST",
       body: formData,
     });
-
-    if (result.success && result.data) {
-      (result.data as any).source = "python";
-    }
-
-    return result;
   }
 
   /**
-   * Process photo - Cloudinary primary, Python fallback
-   * Always uses passport mode with 40% enhancement (no parameters needed)
+   * Process document
    */
-  async processPhoto(
-    imageId: string,
-    cropData?: CropData
-  ): Promise<ApiResponse<ProcessResponse>> {
-    const isCloudinaryImage = !imageId.startsWith("img_");
-
-    // Try Cloudinary if image is from Cloudinary
-    if (this.cloudinaryEnabled && isCloudinaryImage && this.cloudinaryFallbackCount < this.maxCloudinaryAttempts) {
-      console.log("🎨 Attempting Cloudinary processing (passport mode, 40% enhancement)...");
-      
-      const cloudinaryResult = await cloudinaryService.processImage(
-        imageId,
-        cropData
-      );
-      
-      if (cloudinaryResult.success) {
-        console.log("✅ Cloudinary processing successful");
-        this.cloudinaryFallbackCount = 0;
-        return cloudinaryResult as ApiResponse<ProcessResponse>;
-      }
-      
-      this.cloudinaryFallbackCount++;
-      console.warn(`⚠️ Cloudinary processing failed (${this.cloudinaryFallbackCount}/${this.maxCloudinaryAttempts}), trying Python...`);
-    }
-
-    // Python fallback
-    console.log("🔄 Using Python backend processing (fallback)...");
-    const result = await this.request<ProcessResponse>("/process", {
+  async processDocument(documentId: string): Promise<ApiResponse<ProcessResponse>> {
+    return this.request<ProcessResponse>(`/process/${documentId}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        image_id: imageId,
-        crop_data: cropData,
-      }),
-    });
-
-    if (result.success && result.data) {
-      (result.data as any).source = "python";
-    }
-
-    return result;
-  }
-
-  /**
-   * Preview sheet - Works with both Cloudinary and Python images
-   */
-  async previewSheet(
-    imageId: string,
-    layout: "3x4" | "2x3",
-    paper: string = "4x6",
-    dpi: number = 300
-  ): Promise<ApiResponse<SheetPreviewResponse>> {
-    return this.request<SheetPreviewResponse>("/preview-sheet", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        image_id: imageId,
-        layout,
-        paper,
-        dpi,
-      }),
     });
   }
 
   /**
-   * Download sheet
+   * Auto-pair ID cards
    */
-  async downloadSheet(
-    imageId: string,
-    layout: "3x4" | "2x3"
-  ): Promise<ApiResponse<{ 
-    file: string; 
-    filename: string; 
-    size_bytes: number; 
-    dimensions: string; 
-    dpi: number 
-  }>> {
-    return this.request("/download", {
+  async autoPairIDCards(documentIds: string[]): Promise<ApiResponse<PairingResponse>> {
+    return this.request<PairingResponse>("/pair", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        image_id: imageId,
-        layout,
-        format: "png",
-      }),
+      body: JSON.stringify({ document_ids: documentIds }),
     });
   }
 
   /**
-   * Print sheet
+   * Update document rotation
    */
-  async printSheet(
-    imageId: string,
-    layout: "3x4" | "2x3",
-    copies: number = 1
-  ): Promise<ApiResponse<{ 
-    job_id: string; 
-    printer: string; 
-    message: string;
-    settings: any;
-  }>> {
-    return this.request("/print", {
+  async updateDocumentRotation(documentId: string, rotation: number): Promise<ApiResponse<void>> {
+    return this.request<void>(`/documents/${documentId}/rotate`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ rotation }),
+    });
+  }
+
+  /**
+   * Delete document
+   */
+  async deleteDocument(documentId: string): Promise<ApiResponse<void>> {
+    return this.request<void>(`/documents/${documentId}`, {
+      method: "DELETE",
+    });
+  }
+
+  /**
+   * Generate print preview
+   */
+  async generatePrintPreview(config: PrintPreviewRequest): Promise<ApiResponse<string[]>> {
+    const response = await this.request<{ preview_urls: string[] }>("/print/preview", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        image_id: imageId,
-        layout,
-        printer: null,
-        copies,
-      }),
+      body: JSON.stringify(config),
+    });
+
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: response.data.preview_urls,
+      };
+    }
+
+    return response as ApiResponse<string[]>;
+  }
+
+  /**
+   * Create print job
+   */
+  async createPrintJob(config: PrintJobRequest): Promise<ApiResponse<PrintJob>> {
+    return this.request<PrintJob>("/print/job", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(config),
+    });
+  }
+
+  /**
+   * Send to printer
+   */
+  async sendToPrinter(jobId: string): Promise<ApiResponse<void>> {
+    return this.request<void>(`/print/job/${jobId}/print`, {
+      method: "POST",
+    });
+  }
+
+  /**
+   * Get print job status
+   */
+  async getPrintJobStatus(jobId: string): Promise<ApiResponse<PrintJobStatus>> {
+    return this.request<PrintJobStatus>(`/print/job/${jobId}/status`);
+  }
+
+  /**
+   * Reprocess document
+   */
+  async reprocessDocument(documentId: string): Promise<ApiResponse<ProcessResponse>> {
+    return this.request<ProcessResponse>(`/documents/${documentId}/reprocess`, {
+      method: "POST",
     });
   }
 
@@ -220,24 +172,6 @@ class ApiService {
     return this.request<{ status: string }>("/health", {
       method: "GET",
     });
-  }
-
-  /**
-   * Check Cloudinary quota
-   */
-  async checkCloudinaryQuota() {
-    return await cloudinaryService.checkQuota();
-  }
-
-  /**
-   * Get processing source info
-   */
-  getProcessingInfo() {
-    return {
-      cloudinaryEnabled: this.cloudinaryEnabled,
-      cloudinaryFallbackCount: this.cloudinaryFallbackCount,
-      usingPythonFallback: this.cloudinaryFallbackCount >= this.maxCloudinaryAttempts
-    };
   }
 }
 
