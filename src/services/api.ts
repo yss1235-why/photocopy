@@ -35,10 +35,8 @@ class ApiService {
       }
 
       const data = await response.json();
-      return {
-        success: true,
-        data,
-      };
+      // Return the backend's ApiResponse directly (don't wrap it again)
+      return data;
     } catch (error) {
       console.error("API Error:", error);
       return {
