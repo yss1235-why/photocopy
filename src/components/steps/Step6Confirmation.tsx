@@ -1,7 +1,7 @@
-// src/components/steps/Step6Confirmation.tsx
+// src/components/steps/Step6Confirmation.tsx - UPDATED
 
 import { useState, useEffect } from "react";
-import { Printer, CheckCircle2, XCircle, Upload } from "lucide-react";
+import { Printer, CheckCircle2, XCircle, Upload, CreditCard, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiService } from "@/services/api";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,26 @@ const Step6Confirmation = ({
     });
   };
 
+  // Get layout icon and description
+  const getLayoutInfo = () => {
+    if (printConfig.layoutType === 'id_layout') {
+      return {
+        Icon: CreditCard,
+        label: 'ID Card Layout',
+        description: 'Cards printed at actual size (8.5cm × 5.4cm)'
+      };
+    } else {
+      return {
+        Icon: FileText,
+        label: 'Document Layout',
+        description: 'One document per page, scaled to fit A4'
+      };
+    }
+  };
+
+  const layoutInfo = getLayoutInfo();
+  const LayoutIcon = layoutInfo.Icon;
+
   if (status === 'preparing') {
     return (
       <div className="h-[calc(100vh-180px)] flex flex-col p-4">
@@ -115,11 +135,31 @@ const Step6Confirmation = ({
         </Card>
 
         <div className="flex-1 overflow-auto space-y-6">
+          {/* Layout Info */}
+          <Card className="p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <LayoutIcon className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{layoutInfo.label}</h3>
+                <p className="text-sm text-muted-foreground">{layoutInfo.description}</p>
+              </div>
+            </div>
+          </Card>
+
           {/* Summary */}
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">Print Summary</h3>
             
             <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Layout Type</span>
+                <Badge variant="secondary" className="capitalize">
+                  {printConfig.layoutType.replace('_', ' ')}
+                </Badge>
+              </div>
+              <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Total Documents</span>
                 <Badge variant="default" className="text-lg px-3 py-1">
@@ -138,7 +178,7 @@ const Step6Confirmation = ({
               </div>
               <Separator />
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Total Pages</span>
+                <span className="text-muted-foreground">Total Pages to Print</span>
                 <Badge variant="secondary" className="text-lg px-3 py-1">
                   {printConfig.totalPages}
                 </Badge>
@@ -177,7 +217,7 @@ const Step6Confirmation = ({
             size="lg"
           >
             <Printer className="w-5 h-5" />
-            Print Documents
+            Print {printConfig.totalPages} Pages
           </Button>
         </div>
       </div>
@@ -229,7 +269,13 @@ const Step6Confirmation = ({
 
             <div className="space-y-3 mb-6">
               <div className="flex items-center justify-between p-3 bg-muted rounded">
-                <span className="text-sm">Total Pages</span>
+                <span className="text-sm">Layout</span>
+                <Badge variant="secondary" className="capitalize">
+                  {printConfig.layoutType.replace('_', ' ')}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted rounded">
+                <span className="text-sm">Pages Printed</span>
                 <Badge variant="secondary">{printConfig.totalPages}</Badge>
               </div>
               <div className="flex items-center justify-between p-3 bg-muted rounded">
@@ -247,6 +293,7 @@ const Step6Confirmation = ({
                 className="w-full"
                 size="lg"
               >
+                <Printer className="w-5 h-5 mr-2" />
                 Print Again
               </Button>
               <Button
@@ -282,6 +329,7 @@ const Step6Confirmation = ({
               className="w-full"
               size="lg"
             >
+              <Printer className="w-5 h-5 mr-2" />
               Try Again
             </Button>
             <Button
