@@ -1,14 +1,14 @@
-// src/components/steps/Step5PrintSetup.tsx
+// src/components/steps/Step5PrintSetup.tsx - UPDATED for new layout system
 
 import { useState, useEffect } from "react";
-import { ArrowRight, Printer } from "lucide-react";
+import { ArrowRight, Printer, CreditCard, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import type { PairedIDCard, CleanedDocument, PrintConfig } from "@/types";
+import type { PairedIDCard, CleanedDocument, PrintConfig, LayoutType } from "@/types";
 
 interface Step5PrintSetupProps {
   pairedIDs: PairedIDCard[];
@@ -23,7 +23,7 @@ const Step5PrintSetup = ({
 }: Step5PrintSetupProps) => {
   const { toast } = useToast();
   const [printConfig, setPrintConfig] = useState<PrintConfig>({
-    documentsPerPage: 2,
+    layoutType: 'document_layout',
     paperSize: 'a4',
     totalPages: 0,
     layoutPreview: []
@@ -31,31 +31,49 @@ const Step5PrintSetup = ({
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
 
   useEffect(() => {
-    calculateTotalPages(printConfig.documentsPerPage);
+    // Auto-select layout based on document types
+    const hasIDCards = pairedIDs.length > 0;
+    const hasOnlyIDCards = pairedIDs.length > 0 && singleDocuments.length === 0;
+    
+    const initialLayout: LayoutType = hasOnlyIDCards ? 'id_layout' : 'document_layout';
+    
+    setPrintConfig(prev => ({
+      ...prev,
+      layoutType: initialLayout
+    }));
+    
+    calculateTotalPages(initialLayout);
   }, []);
 
-  const calculateTotalPages = (documentsPerPage: number) => {
-    // Paired IDs count as 1 document (front + back on same page)
-    const totalDocuments = pairedIDs.length + singleDocuments.length;
-    const pages = Math.ceil(totalDocuments / documentsPerPage);
+  const calculateTotalPages = (layoutType: LayoutType) => {
+    let pages = 0;
+    
+    if (layoutType === 'id_layout') {
+      // ID Layout: 2 IDs per page (front + back, or 2 fronts)
+      const totalIDs = pairedIDs.length + singleDocuments.length;
+      pages = Math.ceil(totalIDs / 2);
+    } else {
+      // Document Layout: 1 document per page
+      pages = pairedIDs.length + singleDocuments.length;
+    }
 
     setPrintConfig(prev => ({
       ...prev,
-      documentsPerPage,
+      layoutType,
       totalPages: pages
     }));
 
-    generatePreview(documentsPerPage);
+    generatePreview(layoutType);
   };
 
-  const generatePreview = async (documentsPerPage: number) => {
+  const generatePreview = async (layoutType: LayoutType) => {
     setIsGeneratingPreview(true);
 
     try {
       const result = await apiService.generatePrintPreview({
         pairedIDs: pairedIDs.map(p => p.id),
         singleDocs: singleDocuments.map(d => d.id),
-        documentsPerPage,
+        layoutType: layoutType,
         paperSize: 'a4'
       });
 
@@ -78,8 +96,8 @@ const Step5PrintSetup = ({
     }
   };
 
-  const handleLayoutChange = (documentsPerPage: 1 | 2 | 4 | 8) => {
-    calculateTotalPages(documentsPerPage);
+  const handleLayoutChange = (layoutType: LayoutType) => {
+    calculateTotalPages(layoutType);
   };
 
   const handleContinue = () => {
@@ -95,18 +113,33 @@ const Step5PrintSetup = ({
     onContinue(printConfig);
   };
 
+  // Layout options with clear descriptions
   const layoutOptions = [
-    { value: 1, label: '1 per page', description: 'Large, full page' },
-    { value: 2, label: '2 per page', description: 'Half page each' },
-    { value: 4, label: '4 per page', description: 'Quarter page each' },
-    { value: 8, label: '8 per page', description: 'Small, 8 per sheet' }
+    {
+      type: 'id_layout' as LayoutType,
+      icon: CreditCard,
+      label: 'ID Card Layout',
+      description: 'Print ID cards at actual size',
+      details: '8.5cm × 5.4cm per card, 2 cards per A4 page',
+      bestFor: 'Aadhaar, PAN, DL, Voter ID',
+      pageCount: Math.ceil((pairedIDs.length + singleDocuments.length) / 2)
+    },
+    {
+      type: 'document_layout' as LayoutType,
+      icon: FileText,
+      label: 'Document Layout',
+      description: 'One document per page, scaled to fit',
+      details: 'Full A4 page with 10mm margins',
+      bestFor: 'Certificates, statements, forms',
+      pageCount: pairedIDs.length + singleDocuments.length
+    }
   ];
 
   return (
     <div className="h-[calc(100vh-180px)] flex flex-col p-4">
       {/* Header */}
       <Card className="p-6 mb-4">
-        <h2 className="text-2xl font-bold mb-2">Configure Print Layout</h2>
+        <h2 className="text-2xl font-bold mb-2">Choose Print Layout</h2>
         <p className="text-muted-foreground">
           {pairedIDs.length} paired IDs + {singleDocuments.length} single documents
         </p>
@@ -115,60 +148,82 @@ const Step5PrintSetup = ({
       <div className="flex-1 overflow-auto space-y-6">
         {/* Layout Selection */}
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Documents Per Page</h3>
+          <h3 className="text-lg font-semibold mb-4">Print Layout</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {layoutOptions.map(option => (
-              <button
-                key={option.value}
-                onClick={() => handleLayoutChange(option.value as 1 | 2 | 4 | 8)}
-                className={`p-4 rounded-lg border-2 transition-all text-left ${
-                  printConfig.documentsPerPage === option.value
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="font-semibold">{option.label}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {option.description}
-                    </p>
+            {layoutOptions.map(option => {
+              const Icon = option.icon;
+              const isSelected = printConfig.layoutType === option.type;
+              
+              return (
+                <button
+                  key={option.type}
+                  onClick={() => handleLayoutChange(option.type)}
+                  className={`p-6 rounded-lg border-2 transition-all text-left ${
+                    isSelected
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Icon className="w-6 h-6 text-primary" />
+                    </div>
+                    {isSelected && (
+                      <Badge variant="default">Selected</Badge>
+                    )}
                   </div>
-                  {printConfig.documentsPerPage === option.value && (
-                    <Badge variant="default">Selected</Badge>
-                  )}
-                </div>
 
-                {/* Visual representation */}
-                <div className="aspect-[210/297] bg-muted rounded border-2 border-dashed border-border p-2 mt-3">
-                  <div 
-                    className={`grid gap-1 h-full ${
-                      option.value === 1 ? 'grid-cols-1' :
-                      option.value === 2 ? 'grid-cols-1' :
-                      option.value === 4 ? 'grid-cols-2' :
-                      'grid-cols-2'
-                    } ${
-                      option.value === 2 ? 'grid-rows-2' :
-                      option.value === 4 ? 'grid-rows-2' :
-                      option.value === 8 ? 'grid-rows-4' :
-                      'grid-rows-1'
-                    }`}
-                  >
-                    {Array.from({ length: option.value }).map((_, i) => (
-                      <div 
-                        key={i} 
-                        className="bg-primary/20 rounded"
-                      />
-                    ))}
+                  <h4 className="font-semibold text-lg mb-2">{option.label}</h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {option.description}
+                  </p>
+                  
+                  <div className="space-y-2 mb-3">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Details:
+                    </p>
+                    <p className="text-xs">{option.details}</p>
                   </div>
-                </div>
-              </button>
-            ))}
+
+                  <div className="space-y-2 mb-4">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Best for:
+                    </p>
+                    <p className="text-xs">{option.bestFor}</p>
+                  </div>
+
+                  <Separator className="my-3" />
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Total pages:
+                    </span>
+                    <Badge variant="secondary" className="text-base">
+                      {option.pageCount}
+                    </Badge>
+                  </div>
+
+                  {/* Visual representation */}
+                  <div className="aspect-[210/297] bg-muted rounded border-2 border-dashed border-border p-2 mt-4">
+                    <div className="h-full flex flex-col items-center justify-center gap-2">
+                      {option.type === 'id_layout' ? (
+                        <>
+                          <div className="w-3/4 h-1/3 bg-primary/20 rounded border border-primary/30" />
+                          <div className="w-3/4 h-1/3 bg-primary/20 rounded border border-primary/30" />
+                        </>
+                      ) : (
+                        <div className="w-11/12 h-5/6 bg-primary/20 rounded border border-primary/30" />
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </Card>
 
-        {/* Paper Size */}
+        {/* Paper Size Info */}
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Paper Size</h3>
           <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
@@ -185,6 +240,13 @@ const Step5PrintSetup = ({
           <h3 className="text-lg font-semibold mb-4">Print Summary</h3>
           
           <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Layout Type</span>
+              <span className="font-semibold capitalize">
+                {printConfig.layoutType.replace('_', ' ')}
+              </span>
+            </div>
+            <Separator />
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Total Documents</span>
               <span className="font-semibold">
@@ -203,7 +265,7 @@ const Step5PrintSetup = ({
             </div>
             <Separator />
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Total Pages</span>
+              <span className="text-muted-foreground">Total Pages to Print</span>
               <Badge variant="default" className="text-lg px-3 py-1">
                 {printConfig.totalPages}
               </Badge>
@@ -259,7 +321,8 @@ const Step5PrintSetup = ({
           className="w-full gap-2"
           size="lg"
         >
-          Continue to Print
+          <Printer className="w-5 h-5" />
+          Continue to Print ({printConfig.totalPages} pages)
           <ArrowRight className="w-5 h-5" />
         </Button>
       </div>
