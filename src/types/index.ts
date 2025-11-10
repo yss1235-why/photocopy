@@ -1,4 +1,4 @@
-// src/types/index.ts - Complete Type Definitions
+// src/types/index.ts - Complete Type Definitions (UPDATED)
 
 // Document Categories
 export type DocumentCategory = 'id_card' | 'single_document';
@@ -20,6 +20,9 @@ export type SingleDocumentType =
   | 'generic';
 
 export type DocumentType = IDCardType | SingleDocumentType;
+
+// NEW: Layout Types (replacing documentsPerPage)
+export type LayoutType = 'id_layout' | 'document_layout';
 
 // Upload Stage
 export interface UploadedDocument {
@@ -49,7 +52,7 @@ export interface ProcessingDocument {
   error?: string;
 }
 
-// Cleaned Documents
+// Cleaned Documents (UPDATED with AI metadata)
 export interface CleanedDocument {
   id: string;
   originalId: string;
@@ -62,6 +65,15 @@ export interface CleanedDocument {
   dimensions: { width: number; height: number };
   fileSize: number;
   needsPairing: boolean;
+  
+  // NEW: AI detection metadata (optional)
+  detectionMethod?: 'ai' | 'ocr' | 'hybrid';
+  detectionConfidence?: number;
+  aiFeatures?: {
+    hasQRCode?: boolean;
+    colorProfile?: string;
+    layoutScore?: number;
+  };
 }
 
 // ID Card Pairing
@@ -83,12 +95,14 @@ export interface UnpairedIDCard {
   reason: 'no_match' | 'low_confidence' | 'multiple_candidates';
 }
 
-// Print Configuration
+// Print Configuration (UPDATED - simplified)
 export interface PrintConfig {
-  documentsPerPage: 1 | 2 | 4 | 8;
+  layoutType: LayoutType;  // NEW: replaced documentsPerPage
   paperSize: 'a4';
   totalPages: number;
   layoutPreview: string[];
+  
+  // Removed: documentsPerPage (no longer needed)
 }
 
 // Print Job
@@ -152,11 +166,12 @@ export interface PairingResponse {
   unpaired: UnpairedIDCard[];
 }
 
+// NEW: Updated print preview request
 export interface PrintPreviewRequest {
   pairedIDs: string[];
   singleDocs: string[];
-  documentsPerPage: number;
-  paperSize: string;
+  layoutType: LayoutType;  // NEW: layout type instead of docs per page
+  paperSize: 'a4';
 }
 
 export interface PrintJobRequest {
@@ -171,4 +186,13 @@ export interface PrintJobStatus {
   currentPage?: number;
   totalPages: number;
   error?: string;
+}
+
+// NEW: Layout descriptions for UI
+export interface LayoutOption {
+  type: LayoutType;
+  label: string;
+  description: string;
+  icon: string;
+  bestFor: string[];
 }
