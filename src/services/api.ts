@@ -1,4 +1,4 @@
-// src/services/api.ts - Complete API Service
+// src/services/api.ts - Complete API Service (UPDATED)
 
 import { 
   ApiResponse, 
@@ -20,7 +20,7 @@ class ApiService {
   ): Promise<ApiResponse<T>> {
     try {
       const url = `${API_BASE_URL}${endpoint}`;
-      console.log("API Request:", url);
+      console.log("API Request:", url, options.method || "GET");
       
       const response = await fetch(url, {
         ...options,
@@ -35,7 +35,9 @@ class ApiService {
       }
 
       const data = await response.json();
-      // Return the backend's ApiResponse directly (don't wrap it again)
+      console.log("API Response:", data);
+      
+      // Backend returns ApiResponse directly, don't wrap again
       return data;
     } catch (error) {
       console.error("API Error:", error);
@@ -104,9 +106,11 @@ class ApiService {
   }
 
   /**
-   * Generate print preview
+   * Generate print preview (UPDATED for new layout system)
    */
   async generatePrintPreview(config: PrintPreviewRequest): Promise<ApiResponse<string[]>> {
+    console.log("Generating preview with config:", config);
+    
     const response = await this.request<{ preview_urls: string[] }>("/print/preview", {
       method: "POST",
       headers: {
@@ -126,9 +130,11 @@ class ApiService {
   }
 
   /**
-   * Create print job
+   * Create print job (UPDATED for new layout system)
    */
   async createPrintJob(config: PrintJobRequest): Promise<ApiResponse<PrintJob>> {
+    console.log("Creating print job with config:", config);
+    
     return this.request<PrintJob>("/print/job", {
       method: "POST",
       headers: {
